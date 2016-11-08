@@ -1,16 +1,5 @@
 package main
 
-// Minor improvements to golang json example in
-// https://www.thepolyglotdeveloper.com/2016/07/create-a-simple-restful-api-with-golang/
-// Mostly, it just uses a map to store people instead of searching through
-// an array. There are also some commented-out debugging statements.
-// Get the source set up with:
-//   go get github.com/rfay/go_restapi_example
-// Run it with
-//   go run
-// Example POST json to create a new person:
-//   POST to http://localhost:12345/people/4 with:
-//   {"firstname": "ExampleFirstname", "lastname":"NumberFour", "address":{"city":"somewhereIn", "state":"CO"}}
 
 import (
     "encoding/json"
