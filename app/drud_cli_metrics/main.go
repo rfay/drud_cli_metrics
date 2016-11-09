@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	_ "github.com/mattn/go-sqlite3"
 
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -26,17 +27,19 @@ type Person struct {
 	Lastname  string `json:"lastname,omitempty"`
 }
 
-var dbName string
-var db *sql.DB
+// Each of these is a pointer
+var pDb *sql.DB
+var pDbFilepath = flag.String("path", "/var/lib/sqlite3/drud_cli_metrics.db", "Full path to the sqlite3 database file which will be created if it does not exist.")
+var pServerPort = flag.Int("port", 12345, "Port on which service should listen")
 
 func GetPersonEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	id, _ := strconv.Atoi(params["id"])
-	json.NewEncoder(w).Encode(ReadItem(db, id))
+	json.NewEncoder(w).Encode(ReadItem(pDb, id))
 }
 
 func GetPeopleEndpoint(w http.ResponseWriter, req *http.Request) {
-	json.NewEncoder(w).Encode(ReadAllItems(db))
+	json.NewEncoder(w).Encode(ReadAllItems(pDb))
 }
 
 func CreatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
@@ -48,8 +51,8 @@ func CreatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	StoreItem(db, person)
-	json.NewEncoder(w).Encode(ReadAllItems(db))
+	StoreItem(pDb, person)
+	json.NewEncoder(w).Encode(ReadAllItems(pDb))
 }
 
 func UpdatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
@@ -60,17 +63,17 @@ func UpdatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
 	checkErr(err)
 	person.ID = id
 
-	StoreItem(db, person)
+	StoreItem(pDb, person)
 
-	json.NewEncoder(w).Encode(ReadAllItems(db))
+	json.NewEncoder(w).Encode(ReadAllItems(pDb))
 }
 
 func DeletePersonEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	id, _ := strconv.Atoi(params["id"])
 	fmt.Fprintf(os.Stderr, "Deleting id=%d\n", id)
-	DeleteItem(db, id)
-	json.NewEncoder(w).Encode(ReadAllItems(db))
+	DeleteItem(pDb, id)
+	json.NewEncoder(w).Encode(ReadAllItems(pDb))
 }
 
 func InitDB(filepath string) *sql.DB {
@@ -207,13 +210,14 @@ func checkErr(err error) {
 }
 
 func main() {
-	dbFilepath := "/var/lib/sqlite3/drud_cli_metrics.db"
-	if len(os.Args) > 1 {
-		dbFilepath = os.Args[1]
-	}
-	fmt.Printf("Sqlite3 DB filepath=%s\n", dbFilepath)
-	db = InitDB(dbFilepath)
-	CreateTable(db)
+	flag.Parse()
+
+	log.Printf("Will listen on port=%d", *pServerPort)
+	log.Printf("Database fullpath=%s", *pDbFilepath)
+
+	pDb = InitDB(*pDbFilepath)
+	CreateTable(pDb)
+
 	router := mux.NewRouter()
 	// Read all people and return
 	router.HandleFunc("/v1.0/people", GetPeopleEndpoint).Methods("GET")
@@ -227,5 +231,5 @@ func main() {
 	router.HandleFunc("/v1.0/people/{id}", DeletePersonEndpoint).Methods("DELETE")
 
 	// Listen on port
-	log.Fatal(http.ListenAndServe(":12345", router))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *pServerPort), router))
 }
