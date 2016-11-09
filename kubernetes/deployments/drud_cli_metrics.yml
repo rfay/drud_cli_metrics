@@ -1,7 +1,7 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: drud-cli-metrics
+  name: drud-cli-metrics-deployment
 spec:
   replicas: 1
   template:
@@ -11,29 +11,24 @@ spec:
         track: stable
     spec:
       containers:
-        - name: auth
-          image: "udacity/example-auth:1.0.0"
+        - name: drud-cli-metrics-server
+          image: randyfay/drud_cli_metrics:0.0.3
+          args:
+    #        - "-port=0.0.0.0:12345"
+    #        - "-health=0.0.0.0:81"
+    #        - "-secret=secret"
           ports:
             - name: http
-              containerPort: 80
-            - name: health
-              containerPort: 81
+              containerPort: 12345
+    #        - name: health
+    #          containerPort: 81
           resources:
             limits:
               cpu: 0.2
               memory: "10Mi"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 81
-              scheme: HTTP
-            initialDelaySeconds: 5
-            periodSeconds: 15
-            timeoutSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /readiness
-              port: 81
-              scheme: HTTP
-            initialDelaySeconds: 5
-            timeoutSeconds: 1
+          volumeMounts:
+          - mountPath: /var/lib/sqlite3
+            name: sqlite3-db
+      volumes:
+      - name: sqlite3-db
+        emptyDir: {}
