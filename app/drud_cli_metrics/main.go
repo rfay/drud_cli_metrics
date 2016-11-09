@@ -206,10 +206,11 @@ func checkErr(err error) {
 }
 
 func main() {
-	dbFilepath := os.Args[1]
-	if dbFilepath == "" {
-		dbFilepath = "/var/lib/sqlite3/drud_cli_metrics.db"
+	dbFilepath := "/var/lib/sqlite3/drud_cli_metrics.db"
+	if len(os.Args) > 1 {
+		dbFilepath = os.Args[1]
 	}
+	fmt.Printf("Sqlite3 DB filepath=%s\n", dbFilepath)
 	db = InitDB(dbFilepath)
 	CreateTable(db)
 	router := mux.NewRouter()
