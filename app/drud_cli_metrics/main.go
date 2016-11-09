@@ -76,6 +76,12 @@ func DeletePersonEndpoint(w http.ResponseWriter, req *http.Request) {
 }
 
 func InitDB(filepath string) *sql.DB {
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		log.Printf("DB File %s does not exist so will be created", filepath)
+	} else {
+		log.Printf("DB File %s already exists", filepath)
+	}
+
 	db, err := sql.Open("sqlite3", filepath)
 	if err != nil {
 		panic(err)
