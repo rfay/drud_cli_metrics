@@ -3,6 +3,7 @@ package main
 // Microservice to accept logging from drud cli tool
 // Many thanks for
 //   sqlite3: https://siongui.github.io/2016/01/09/go-sqlite-example-basic-usage/
+//   sqlite3: https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/05.3.html
 //   json API: https://www.thepolyglotdeveloper.com/2016/07/create-a-simple-restful-api-with-golang/
 
 import (
