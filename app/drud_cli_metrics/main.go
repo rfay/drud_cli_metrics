@@ -43,7 +43,6 @@ func GetPeopleEndpoint(w http.ResponseWriter, req *http.Request) {
 }
 
 func CreatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
-	//fmt.Fprintf(os.Stderr, "Params: %v\n", params);
 	var person Person
 	result := json.NewDecoder(req.Body).Decode(&person)
 	if result != nil {
@@ -192,8 +191,6 @@ func DeleteItem(db *sql.DB, id int) {
 	DELETE FROM items
 	WHERE ID = ?
 	`
-
-	fmt.Fprintf(os.Stderr, "DeleteItem deleting item=%d\n", id)
 	stmt, err := db.Prepare(sql_delete)
 	checkErr(err)
 	res, err := stmt.Exec(id)
@@ -212,8 +209,8 @@ func checkErr(err error) {
 func main() {
 	flag.Parse()
 
-	log.Printf("Will listen on port=%d", *pServerPort)
-	log.Printf("Database fullpath=%s", *pDbFilepath)
+	log.Printf("Will listen on port=%d\n", *pServerPort)
+	log.Printf("Sqlite DB file fullpath=%s\n", *pDbFilepath)
 
 	pDb = InitDB(*pDbFilepath)
 	CreateTable(pDb)

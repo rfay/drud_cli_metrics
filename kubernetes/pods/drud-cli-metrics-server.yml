@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
     - name: drud-cli-metrics-server
-      image: randyfay/drud_cli_metrics:0.0.3
+      image: randyfay/drud_cli_metrics:0.0.5
       args:
 #        - "-port=0.0.0.0:12345"
 #        - "-health=0.0.0.0:81"
