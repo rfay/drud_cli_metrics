@@ -1,5 +1,10 @@
 package main
 
+// Microservice to accept logging from drud cli tool
+// Many thanks for
+//   sqlite3: https://siongui.github.io/2016/01/09/go-sqlite-example-basic-usage/
+//   json API: https://www.thepolyglotdeveloper.com/2016/07/create-a-simple-restful-api-with-golang/
+
 import (
 	"database/sql"
 	"encoding/json"
@@ -20,8 +25,8 @@ type Person struct {
 	Lastname  string `json:"lastname,omitempty"`
 }
 
-var dbName = "foo.db"
-var db = InitDB(dbName)
+var dbName string
+var db *sql.DB
 
 func GetPersonEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
@@ -201,18 +206,23 @@ func checkErr(err error) {
 }
 
 func main() {
+	dbFilepath := os.Args[1]
+	if dbFilepath == "" {
+		dbFilepath = "/var/lib/sqlite3/drud_cli_metrics.db"
+	}
+	db = InitDB(dbFilepath)
 	CreateTable(db)
 	router := mux.NewRouter()
 	// Read all people and return
-	router.HandleFunc("/people", GetPeopleEndpoint).Methods("GET")
+	router.HandleFunc("/v1.0/people", GetPeopleEndpoint).Methods("GET")
 	// Create a person - ID is automatically incremented
-	router.HandleFunc("/people", CreatePersonEndpoint).Methods("POST")
+	router.HandleFunc("/v1.0/people", CreatePersonEndpoint).Methods("POST")
 	// Get a single person
-	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
+	router.HandleFunc("/v1.0/people/{id}", GetPersonEndpoint).Methods("GET")
 	// Update a single person
-	router.HandleFunc("/people/{id}", UpdatePersonEndpoint).Methods("POST")
+	router.HandleFunc("/v1.0/people/{id}", UpdatePersonEndpoint).Methods("POST")
 	// Delete an item by id
-	router.HandleFunc("/people/{id}", DeletePersonEndpoint).Methods("DELETE")
+	router.HandleFunc("/v1.0/people/{id}", DeletePersonEndpoint).Methods("DELETE")
 
 	// Listen on port
 	log.Fatal(http.ListenAndServe(":12345", router))
