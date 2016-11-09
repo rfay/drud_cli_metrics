@@ -17,7 +17,7 @@ TAG=0.0.5
 OWNER=randyfay
 go build --tags netgo --ldflags '-extldflags "-lm -lstdc++ -static"'
 
-docker build -t drud_cli_metrics:$TAG .
-docker tag drud_cli_metrics:$TAG $OWNER/drud_cli_metrics:$TAG
-docker push randyfay/drud_cli_metrics:$TAG
+docker build -t "drud_cli_metrics:$TAG" .
+docker tag "drud_cli_metrics:$TAG" "$OWNER/drud_cli_metrics:$TAG"
+docker push "$OWNER/drud_cli_metrics:$TAG"
 ```

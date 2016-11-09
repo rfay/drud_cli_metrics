@@ -26,4 +26,5 @@ spec:
         name: sqlite3-db
   volumes:
   - name: sqlite3-db
-    emptyDir: {}
+    hostPath:
+      path: /var/lib/sqlite3
