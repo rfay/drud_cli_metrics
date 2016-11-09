@@ -26,5 +26,6 @@ spec:
         name: sqlite3-db
   volumes:
   - name: sqlite3-db
+    # NOTE THAT hostPath cannot support more than one node
     hostPath:
       path: /var/lib/sqlite3
