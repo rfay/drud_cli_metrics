@@ -35,8 +35,11 @@ kubectl logs -f <pod_name>
 ## JSON requests
 ```
 GET http://<cluster_ip>.:30001/v1.0/logitems
+curl -X GET -H "Cache-Control: no-cache" "http://192.168.99.100.:30001/v1.0/logitem"
+
 
 POST http://<cluster_ip>:30001/v1.0/logitems
-Body: {"result_code":403, "machine_id":"2301", "info":"nonoe", "client_timestamp": 939393}
 
+Body: {"result_code":403, "machine_id":"2301", "info":"nonoe", "client_timestamp": 939393}
+curl -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache"  -d '{"result_code":403, "machine_id":"2301", "info":"nonoe", "client_timestamp": 939393}' "http://192.168.99.100:30001/v1.0/logitem"
 ```
