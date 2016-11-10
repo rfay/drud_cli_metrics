@@ -2,7 +2,7 @@
 
 Runs a service to collect logging information from drud cli runs.
 
-## Deployment (in root directory)
+## Deployment (in kubernetes directory)
 ```
 kubectl create -f deployments/drud_cli_metrics.yml
 kubectl create -f services/drud_cli_metrics.yml
