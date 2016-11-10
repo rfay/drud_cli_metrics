@@ -23,12 +23,12 @@ import (
 )
 
 type LogItem struct {
-	ID                int    `json:"id,omitempty"`
-	clientTimestamp   int    `json:"client_timestamp,omitempty"`
-	resultCode        int    `json:"result_code,omitempty"`
-	machineId         string `json:"machine_id,omitempty"`
-	info              string `json:info,omitempty"`
-	insertedTimestamp string `json:"result_code,omitempty"`
+	ID               int64  `json:"id,omitempty"`
+	ResultCode       int64  `json:"result_code"`
+	MachineId        string `json:"machine_id,omitempty"`
+	Info             string `json:"info,omitempty"`
+	ClientTimestamp  int64  `json:"client_timestamp,omitempty"`
+	InsertedDatetime string `json:"inserted_datetime,omitempty"`
 }
 
 // Each of these is a pointer
@@ -38,7 +38,8 @@ var pServerPort = flag.Int("port", 12345, "Port on which service should listen")
 
 func getLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
-	id, _ := strconv.Atoi(params["id"])
+	id, _ := strconv.ParseInt(params["id"], 10, 64)
+
 	item, err := readItem(pDb, id)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -48,12 +49,13 @@ func getLogEndpoint(w http.ResponseWriter, req *http.Request) {
 }
 
 func getAllLogsEndpoint(w http.ResponseWriter, req *http.Request) {
-	json.NewEncoder(w).Encode(readAllItems(pDb))
+	logItems := readAllItems(pDb)
+
+	json.NewEncoder(w).Encode(logItems)
 }
 
 func createLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	var logItem LogItem
-	log.Printf("createLogEndpoint: Incoming body=%v", req.Body)
 
 	err := json.NewDecoder(req.Body).Decode(&logItem)
 	if err != nil {
@@ -61,31 +63,34 @@ func createLogEndpoint(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	log.Printf("createLogEndpoint: Incoming logItem=%v", logItem)
 
-	count, _ := storeItem(pDb, logItem)
+	count, insertId := storeItem(pDb, logItem)
 	if count != 1 {
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-	json.NewEncoder(w).Encode(readAllItems(pDb))
+	// This extra read is extraneous, and we don't actually have to report
+	// the exact result, but it's useful for the short term.
+	logItem, _ = readItem(pDb, insertId)
+	json.NewEncoder(w).Encode(logItem)
 }
 
 func updateLogEndpoint(w http.ResponseWriter, req *http.Request) {
-	var log LogItem
+	var logItem LogItem
 	params := mux.Vars(req)
-	id, _ := strconv.Atoi(params["id"])
-	err := json.NewDecoder(req.Body).Decode(&log)
+	id, _ := strconv.ParseInt(params["id"], 10, 64)
+	err := json.NewDecoder(req.Body).Decode(&logItem)
 	checkErr(err)
-	log.ID = id
+	logItem.ID = id
 
-	storeItem(pDb, log)
+	storeItem(pDb, logItem)
 
 	json.NewEncoder(w).Encode(readAllItems(pDb))
 }
 
 func deleteLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
-	id, _ := strconv.Atoi(params["id"])
+	id, _ := strconv.ParseInt(params["id"], 10, 64)
 	fmt.Fprintf(os.Stderr, "Deleting id=%d\n", id)
 	deleteItem(pDb, id)
 	json.NewEncoder(w).Encode(readAllItems(pDb))
@@ -121,7 +126,7 @@ func createLogsTable(db *sql.DB) {
 		resultCode INTEGER,
 		machineId TEXT,
 		info TEXT,
-		InsertedDatetime DATETIME
+		insertedDatetime DATETIME
 	);
 	`
 
@@ -131,24 +136,24 @@ func createLogsTable(db *sql.DB) {
 	}
 }
 
-func storeItem(db *sql.DB, item LogItem) (int64, error) {
-	log.Printf("storeItem: Incoming item=%v", item)
+func storeItem(db *sql.DB, item LogItem) (int64, int64) {
+	//log.Printf("storeItem: Incoming item=%v", item)
 	var res sql.Result
 	if item.ID != 0 {
-		upsertQuery := `INSERT OR REPLACE INTO logs (
+		upsertQuery := `insert or replace into logs (
 		ID,
 		clientTimestamp,
 		resultCode,
 		machineId,
 		info,
-		InsertedDatetime
+		insertedDatetime
 	        ) values(?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
 
 		stmt, err := db.Prepare(upsertQuery)
 		if err != nil {
 			log.Fatal(err)
 		}
-		res, err = stmt.Exec(item.ID, item.clientTimestamp, item.resultCode, item.machineId, item.info)
+		res, err = stmt.Exec(item.ID, item.ClientTimestamp, item.ResultCode, item.MachineId, item.Info)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -158,28 +163,29 @@ func storeItem(db *sql.DB, item LogItem) (int64, error) {
 		resultCode,
 		machineId,
 		info,
-		InsertedDatetime
+		insertedDatetime
 	        ) values(?, ?, ?, ?, CURRENT_TIMESTAMP)`
 
 		stmt, err := db.Prepare(insertQuery)
 		if err != nil {
 			log.Fatal(err)
 		}
-		res, err = stmt.Exec(item.clientTimestamp, item.resultCode, item.machineId, item.info)
+		res, err = stmt.Exec(item.ClientTimestamp, item.ResultCode, item.MachineId, item.Info)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	}
 
-	return res.RowsAffected()
-
+	affectedRowCount, _ := res.RowsAffected()
+	insertId, _ := res.LastInsertId()
+	return affectedRowCount, insertId
 }
 
 func readAllItems(db *sql.DB) []LogItem {
 	sql_readall := `
-	select * from logs
-	order by datetime(InsertedDatetime)
+	SELECT id, clientTimestamp, resultCode, machineId, info, insertedDatetime FROM logs
+	ORDER BY datetime(insertedDatetime)
 	`
 
 	rows, err := db.Query(sql_readall)
@@ -190,28 +196,28 @@ func readAllItems(db *sql.DB) []LogItem {
 
 	var result []LogItem
 	for rows.Next() {
-		item := LogItem{}
-		err2 := rows.Scan(&item.ID, &item.clientTimestamp, &item.resultCode, &item.machineId, &item.info, &item.insertedTimestamp)
+		logItem := LogItem{}
+		err2 := rows.Scan(&logItem.ID, &logItem.ClientTimestamp, &logItem.ResultCode, &logItem.MachineId, &logItem.Info, &logItem.InsertedDatetime)
 		if err2 != nil {
 			panic(err2)
 		}
-		result = append(result, item)
+		result = append(result, logItem)
 	}
 	return result
 }
 
-func readItem(db *sql.DB, id int) (LogItem, error) {
+func readItem(db *sql.DB, id int64) (LogItem, error) {
 	sqlReadOne := `
 	select * from logs
 	where ID = ?
 	`
 
 	var item LogItem
-	err := db.QueryRow(sqlReadOne, id).Scan(&item.ID, &item.clientTimestamp, &item.resultCode, &item.machineId, &item.info, &item.insertedTimestamp)
+	err := db.QueryRow(sqlReadOne, id).Scan(&item.ID, &item.ClientTimestamp, &item.ResultCode, &item.MachineId, &item.Info, &item.InsertedDatetime)
 	return item, err
 }
 
-func deleteItem(db *sql.DB, id int) {
+func deleteItem(db *sql.DB, id int64) {
 	sql_delete := `
 	delete from logs
 	where ID = ?
@@ -244,18 +250,18 @@ func main() {
 
 	router := mux.NewRouter()
 	// Read all command log and return
-	router.HandleFunc("/v1.0/log", getAllLogsEndpoint).Methods("GET")
+	router.HandleFunc("/v1.0/logitem", getAllLogsEndpoint).Methods("GET")
 	// Create a command log - ID is automatically incremented
-	router.HandleFunc("/v1.0/log", createLogEndpoint).Methods("POST")
+	router.HandleFunc("/v1.0/logitem", createLogEndpoint).Methods("POST")
 	// Get a single log
-	router.HandleFunc("/v1.0/log/{id}", getLogEndpoint).Methods("GET")
+	router.HandleFunc("/v1.0/logitem/{id}", getLogEndpoint).Methods("GET")
 	// Update a single log
-	router.HandleFunc("/v1.0/log/{id}", updateLogEndpoint).Methods("POST")
+	router.HandleFunc("/v1.0/logitem/{id}", updateLogEndpoint).Methods("POST")
 	// Delete an item by id
-	router.HandleFunc("/v1.0/log/{id}", deleteLogEndpoint).Methods("DELETE")
+	router.HandleFunc("/v1.0/logitem/{id}", deleteLogEndpoint).Methods("DELETE")
 	// Readiness probe
 	router.HandleFunc("/readiness", livenessEndpoint).Methods("GET")
-	// Liveness probe
+	// Liveness probe - just reuse. Could easily be the same URI instead of separate
 	router.HandleFunc("/healthz", livenessEndpoint).Methods("GET")
 
 	// Listen on port

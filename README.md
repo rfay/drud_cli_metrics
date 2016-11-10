@@ -34,9 +34,9 @@ kubectl logs -f <pod_name>
 
 ## JSON requests
 ```
-GET http://<cluster_ip>.:30001/v1.0/people
+GET http://<cluster_ip>.:30001/v1.0/logitems
 
-POST http://<cluster_ip>.:30001/v1.0/people
-Body: {"firstname": "FirstnameSample", "lastname":"Lastname1"}
+POST http://<cluster_ip>:30001/v1.0/logitems
+Body: {"result_code":403, "machine_id":"2301", "info":"nonoe", "client_timestamp": 939393}
 
 ```
