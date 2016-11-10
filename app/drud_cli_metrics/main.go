@@ -35,7 +35,12 @@ var pServerPort = flag.Int("port", 12345, "Port on which service should listen")
 func GetPersonEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	id, _ := strconv.Atoi(params["id"])
-	json.NewEncoder(w).Encode(ReadItem(pDb, id))
+	item, err := ReadItem(pDb, id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+	} else {
+		json.NewEncoder(w).Encode(item)
+	}
 }
 
 func GetPeopleEndpoint(w http.ResponseWriter, req *http.Request) {
@@ -186,7 +191,7 @@ func ReadAllItems(db *sql.DB) []Person {
 	return result
 }
 
-func ReadItem(db *sql.DB, id int) Person {
+func ReadItem(db *sql.DB, id int) (Person, error) {
 	sqlReadOne := `
 	SELECT ID, FirstName, LastName FROM items
 	WHERE ID = ?
@@ -194,9 +199,9 @@ func ReadItem(db *sql.DB, id int) Person {
 	`
 
 	var item Person
-	db.QueryRow(sqlReadOne, id).Scan(&item.ID, &item.Firstname, &item.Lastname)
+	err := db.QueryRow(sqlReadOne, id).Scan(&item.ID, &item.Firstname, &item.Lastname)
 
-	return item
+	return item, err
 }
 
 func DeleteItem(db *sql.DB, id int) {
