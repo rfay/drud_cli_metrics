@@ -1,0 +1,32 @@
+# Note that this is not used if you're running a deployment
+apiVersion: v1
+kind: Pod
+metadata:
+  name: drud-cli-metrics-pod
+  labels:
+    app: drud-cli-metrics
+spec:
+  containers:
+    - name: drud-cli-metrics-server
+      image: randyfay/drud_cli_metrics:0.0.8
+      args:
+#        - "-port=0.0.0.0:12345"
+#        - "-health=0.0.0.0:81"
+#        - "-secret=secret"
+      ports:
+        - name: http
+          containerPort: 12345
+#        - name: health
+#          containerPort: 81
+      resources:
+        limits:
+          cpu: 0.2
+          memory: "10Mi"
+      volumeMounts:
+      - mountPath: /var/lib/sqlite3
+        name: sqlite3-db
+  volumes:
+  - name: sqlite3-db
+    # NOTE THAT hostPath cannot support more than one node
+    hostPath:
+      path: /var/lib/sqlite3

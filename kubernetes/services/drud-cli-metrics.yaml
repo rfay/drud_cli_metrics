@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: "drud-cli-metrics-service"
+spec:
+  selector:
+    app: "drud-cli-metrics"
+  ports:
+    - protocol: "TCP"
+      port: 12345
+      targetPort: 12345
+      nodePort: 30001
+  type: NodePort

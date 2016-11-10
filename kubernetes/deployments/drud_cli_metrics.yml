@@ -1,0 +1,47 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: drud-cli-metrics-deployment
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: drud-cli-metrics
+        track: stable
+    spec:
+      containers:
+        - name: drud-cli-metrics-container
+          image: randyfay/drud_cli_metrics:0.0.8
+          args:
+          ports:
+            - name: http
+              containerPort: 12345
+          resources:
+            limits:
+              cpu: 0.2
+              memory: "10Mi"
+          volumeMounts:
+          - mountPath: /var/lib/sqlite3
+            name: sqlite3-db
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 12345
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 12345
+              scheme: HTTP
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+
+      volumes:
+      - name: sqlite3-db
+        # NOTE THAT hostPath cannot support more than one node
+        hostPath:
+          path: /var/lib/sqlite3
