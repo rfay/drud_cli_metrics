@@ -21,10 +21,13 @@ import (
 	"strconv"
 )
 
-type Person struct {
-	ID        int    `json:"id,omitempty"`
-	Firstname string `json:"firstname,omitempty"`
-	Lastname  string `json:"lastname,omitempty"`
+type LogItem struct {
+	ID                int    `json:"id,omitempty"`
+	clientTimestamp   int    `json:"client_timestamp,omitempty"`
+	resultCode        int    `json:"result_code,omitempty"`
+	machineId         string `json:"machine_id,omitempty"`
+	info              string `json:info,omitempty"`
+	insertedTimestamp string `json:"result_code,omitempty"`
 }
 
 // Each of these is a pointer
@@ -32,7 +35,7 @@ var pDb *sql.DB
 var pDbFilepath = flag.String("path", "/var/lib/sqlite3/drud_cli_metrics.db", "Full path to the sqlite3 database file which will be created if it does not exist.")
 var pServerPort = flag.Int("port", 12345, "Port on which service should listen")
 
-func GetPersonEndpoint(w http.ResponseWriter, req *http.Request) {
+func GetLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	id, _ := strconv.Atoi(params["id"])
 	item, err := ReadItem(pDb, id)
@@ -43,12 +46,12 @@ func GetPersonEndpoint(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func GetPeopleEndpoint(w http.ResponseWriter, req *http.Request) {
+func GetAllLogsEndpoint(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(ReadAllItems(pDb))
 }
 
-func CreatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
-	var person Person
+func CreateLogEndpoint(w http.ResponseWriter, req *http.Request) {
+	var person LogItem
 	result := json.NewDecoder(req.Body).Decode(&person)
 	if result != nil {
 		fmt.Fprintf(os.Stderr, "result=%v\n", result)
@@ -59,20 +62,20 @@ func CreatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(ReadAllItems(pDb))
 }
 
-func UpdatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
-	var person Person
+func UpdateLogEndpoint(w http.ResponseWriter, req *http.Request) {
+	var log LogItem
 	params := mux.Vars(req)
 	id, _ := strconv.Atoi(params["id"])
-	err := json.NewDecoder(req.Body).Decode(&person)
+	err := json.NewDecoder(req.Body).Decode(&log)
 	checkErr(err)
-	person.ID = id
+	log.ID = id
 
-	StoreItem(pDb, person)
+	StoreItem(pDb, log)
 
 	json.NewEncoder(w).Encode(ReadAllItems(pDb))
 }
 
-func DeletePersonEndpoint(w http.ResponseWriter, req *http.Request) {
+func DeleteLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	id, _ := strconv.Atoi(params["id"])
 	fmt.Fprintf(os.Stderr, "Deleting id=%d\n", id)
@@ -107,10 +110,12 @@ func InitDB(filepath string) *sql.DB {
 func CreateTable(db *sql.DB) {
 	// create table if not exists
 	sql_table := `
-	CREATE TABLE IF NOT EXISTS items(
+	create table if not exists logs (
 		ID INTEGER PRIMARY KEY,
-		FirstName TEXT,
-		LastName TEXT,
+		clientTimestamp INTEGER,
+		resultCode INTEGER,
+		machineId TEXT,
+		info TEXT,
 		InsertedDatetime DATETIME
 	);
 	`
@@ -121,27 +126,31 @@ func CreateTable(db *sql.DB) {
 	}
 }
 
-func StoreItem(db *sql.DB, item Person) {
-	var items []Person
+func StoreItem(db *sql.DB, item LogItem) {
+	var items []LogItem
 	items = append(items, item)
 	StoreItems(db, items)
 }
 
-func StoreItems(db *sql.DB, items []Person) {
+func StoreItems(db *sql.DB, items []LogItem) {
 	sqlAddItemWithIdQuery := `
-	INSERT OR REPLACE INTO items(
+	INSERT OR REPLACE INTO logs (
 		ID,
-		FirstName,
-		LastName,
+		clientTimestamp,
+		resultCode,
+		machineId,
+		info,
 		InsertedDatetime
-	) values(?, ?, ?, CURRENT_TIMESTAMP)
+	) values(?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
 	sqlAddItemNoIdQuery := `
-	INSERT INTO items(
-		FirstName,
-		LastName,
+	INSERT INTO logs (
+		clientTimestamp,
+		resultCode,
+		machineId,
+		info,
 		InsertedDatetime
-	) values(?, ?, CURRENT_TIMESTAMP)`
+	) values(?, ?, ?, ?, CURRENT_TIMESTAMP)`
 
 	idStatement, err := db.Prepare(sqlAddItemWithIdQuery)
 	if err != nil {
@@ -153,24 +162,25 @@ func StoreItems(db *sql.DB, items []Person) {
 	if err != nil {
 		panic(err)
 	}
+	defer noIdStatement.Close()
 
 	for _, item := range items {
 		// If ID is provided, do upsert, otherwise do insert
 		if item.ID != 0 {
-			_, err := idStatement.Exec(item.ID, item.Firstname, item.Lastname)
+			_, err := idStatement.Exec(item.ID, item.clientTimestamp, item.resultCode, item.machineId, item.info)
 			checkErr(err)
 		} else {
-			_, err := noIdStatement.Exec(item.Firstname, item.Lastname)
+			_, err := noIdStatement.Exec(item.clientTimestamp, item.resultCode, item.machineId, item.info)
 			checkErr(err)
 		}
 
 	}
 }
 
-func ReadAllItems(db *sql.DB) []Person {
+func ReadAllItems(db *sql.DB) []LogItem {
 	sql_readall := `
-	SELECT ID, FirstName, LastName FROM items
-	ORDER BY datetime(InsertedDatetime) DESC
+	select * from logs
+	order by datetime(InsertedDatetime)
 	`
 
 	rows, err := db.Query(sql_readall)
@@ -179,10 +189,10 @@ func ReadAllItems(db *sql.DB) []Person {
 	}
 	defer rows.Close()
 
-	var result []Person
+	var result []LogItem
 	for rows.Next() {
-		item := Person{}
-		err2 := rows.Scan(&item.ID, &item.Firstname, &item.Lastname)
+		item := LogItem{}
+		err2 := rows.Scan(&item.ID, &item.clientTimestamp, &item.resultCode, &item.machineId, &item.info, &item.insertedTimestamp)
 		if err2 != nil {
 			panic(err2)
 		}
@@ -191,23 +201,21 @@ func ReadAllItems(db *sql.DB) []Person {
 	return result
 }
 
-func ReadItem(db *sql.DB, id int) (Person, error) {
+func ReadItem(db *sql.DB, id int) (LogItem, error) {
 	sqlReadOne := `
-	SELECT ID, FirstName, LastName FROM items
-	WHERE ID = ?
-	ORDER BY datetime(InsertedDatetime) DESC
+	select * from logs
+	where ID = ?
 	`
 
-	var item Person
-	err := db.QueryRow(sqlReadOne, id).Scan(&item.ID, &item.Firstname, &item.Lastname)
-
+	var item LogItem
+	err := db.QueryRow(sqlReadOne, id).Scan(&item.ID, &item.clientTimestamp, &item.resultCode, &item.machineId, &item.info, &item.insertedTimestamp)
 	return item, err
 }
 
 func DeleteItem(db *sql.DB, id int) {
 	sql_delete := `
-	DELETE FROM items
-	WHERE ID = ?
+	delete from logs
+	where ID = ?
 	`
 	stmt, err := db.Prepare(sql_delete)
 	checkErr(err)
@@ -234,16 +242,16 @@ func main() {
 	CreateTable(pDb)
 
 	router := mux.NewRouter()
-	// Read all people and return
-	router.HandleFunc("/v1.0/people", GetPeopleEndpoint).Methods("GET")
-	// Create a person - ID is automatically incremented
-	router.HandleFunc("/v1.0/people", CreatePersonEndpoint).Methods("POST")
+	// Read all command log and return
+	router.HandleFunc("/v1.0/log", GetAllLogsEndpoint).Methods("GET")
+	// Create a command log - ID is automatically incremented
+	router.HandleFunc("/v1.0/log", CreateLogEndpoint).Methods("POST")
 	// Get a single person
-	router.HandleFunc("/v1.0/people/{id}", GetPersonEndpoint).Methods("GET")
+	router.HandleFunc("/v1.0/log/{id}", GetLogEndpoint).Methods("GET")
 	// Update a single person
-	router.HandleFunc("/v1.0/people/{id}", UpdatePersonEndpoint).Methods("POST")
+	router.HandleFunc("/v1.0/log/{id}", UpdateLogEndpoint).Methods("POST")
 	// Delete an item by id
-	router.HandleFunc("/v1.0/people/{id}", DeletePersonEndpoint).Methods("DELETE")
+	router.HandleFunc("/v1.0/log/{id}", DeleteLogEndpoint).Methods("DELETE")
 	// Readiness probe
 	router.HandleFunc("/readiness", ReadinessEndpoint).Methods("GET")
 	// Liveness probe
