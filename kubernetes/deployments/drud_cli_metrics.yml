@@ -29,6 +29,22 @@ spec:
           volumeMounts:
           - mountPath: /var/lib/sqlite3
             name: sqlite3-db
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 12345
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 12345
+              scheme: HTTP
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+
       volumes:
       - name: sqlite3-db
         # NOTE THAT hostPath cannot support more than one node

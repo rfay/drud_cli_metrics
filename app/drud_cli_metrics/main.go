@@ -75,6 +75,13 @@ func DeletePersonEndpoint(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(ReadAllItems(pDb))
 }
 
+func LivenessEndpoint(w http.ResponseWriter, req *http.Request) {
+	json.NewEncoder(w).Encode("alive")
+}
+func ReadinessEndpoint(w http.ResponseWriter, req *http.Request) {
+	json.NewEncoder(w).Encode("ready")
+}
+
 func InitDB(filepath string) *sql.DB {
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
 		log.Printf("DB File %s does not exist so will be created", filepath)
@@ -232,6 +239,10 @@ func main() {
 	router.HandleFunc("/v1.0/people/{id}", UpdatePersonEndpoint).Methods("POST")
 	// Delete an item by id
 	router.HandleFunc("/v1.0/people/{id}", DeletePersonEndpoint).Methods("DELETE")
+	// Readiness probe
+	router.HandleFunc("/readiness", ReadinessEndpoint).Methods("GET")
+	// Liveness probe
+	router.HandleFunc("/healthz", LivenessEndpoint).Methods("GET")
 
 	// Listen on port
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *pServerPort), router))
