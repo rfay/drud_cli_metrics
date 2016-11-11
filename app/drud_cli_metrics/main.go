@@ -37,6 +37,7 @@ var pDb *sql.DB
 var pDbFilepath = flag.String("path", "/var/lib/sqlite3/drud_cli_metrics.db", "Full path to the sqlite3 database file which will be created if it does not exist.")
 var pServerPort = flag.Int("port", 12345, "Port on which service should listen")
 
+// getLogEndpoint it the implementation for GET /v1.0/logentry/{id}
 func getLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	id, _ := strconv.ParseInt(params["id"], 10, 64)
@@ -49,12 +50,19 @@ func getLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func getAllLogsEndpoint(w http.ResponseWriter, req *http.Request) {
+// getAllLogsEndpoint is the implementation for GET /v1.0/logentry
+//
+// It currently returns all log entries, but needs to be limited or provide
+// a query.
+func getAllLogsEndpoint(w http.ResponseWriter, _ *http.Request) {
 	logItems := readAllItems(pDb)
 
 	json.NewEncoder(w).Encode(logItems)
 }
 
+// createLogEndpoint is the implentation for POST /v1.0/logentry
+//
+// based on json provided, it will write a new logentry into the db
 func createLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	var logItem LogItem
 
@@ -76,6 +84,8 @@ func createLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(logItem)
 }
 
+// updateLogEndpoint is the implementation for POST /v1.0/logentry/{id}
+// and it will update an existing item
 func updateLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	var logItem LogItem
 	params := mux.Vars(req)
@@ -89,18 +99,28 @@ func updateLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(readAllItems(pDb))
 }
 
+// deleteLogEndpoint is the implementation of DELETE /v1.0/logentry/{id}
 func deleteLogEndpoint(w http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	id, _ := strconv.ParseInt(params["id"], 10, 64)
 	fmt.Fprintf(os.Stderr, "Deleting id=%d\n", id)
-	deleteItem(pDb, id)
-	json.NewEncoder(w).Encode(readAllItems(pDb))
+	affected := deleteItem(pDb, id)
+	if affected == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} else {
+		// TODO: Remove this as only useful for debugging interactions
+		json.NewEncoder(w).Encode(readAllItems(pDb))
+	}
 }
 
-func livenessEndpoint(w http.ResponseWriter, req *http.Request) {
+// livenessEndpoint is a trivial function to be used by kubernetes for
+// determining whether a service is ready
+func livenessEndpoint(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode("alive")
 }
 
+// initDB creates a sqlite3 file if necessary with the filepath provided
 func initDB(filepath string) *sql.DB {
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
 		log.Printf("DB File %s does not exist so will be created", filepath)
@@ -118,6 +138,7 @@ func initDB(filepath string) *sql.DB {
 	return db
 }
 
+// createLogsTable creates the logs table if it doesn't already exist
 func createLogsTable(db *sql.DB) {
 	// create table if not exists
 	sqlTable := `
@@ -137,6 +158,7 @@ func createLogsTable(db *sql.DB) {
 	}
 }
 
+// storeItem writes an item to the database (or updates if it if already exists)
 func storeItem(db *sql.DB, item LogItem) (int64, int64) {
 	//log.Printf("storeItem: Incoming item=%v", item)
 	var res sql.Result
@@ -183,6 +205,8 @@ func storeItem(db *sql.DB, item LogItem) (int64, int64) {
 	return affectedRowCount, insertID
 }
 
+// readAllItems gets all existing items from the logs table
+// It probably shouldn't do that.
 func readAllItems(db *sql.DB) []LogItem {
 	sqlReadAll := `
 	SELECT id, clientTimestamp, resultCode, machineId, info, insertedDatetime FROM logs
@@ -207,6 +231,9 @@ func readAllItems(db *sql.DB) []LogItem {
 	return result
 }
 
+// readItem returns one item from the database based on the id passed in.
+// It returns both item and err so it's possible for the caller to find out
+// if anything was actually found.
 func readItem(db *sql.DB, id int64) (LogItem, error) {
 	sqlReadOne := `
 	select * from logs
@@ -218,7 +245,8 @@ func readItem(db *sql.DB, id int64) (LogItem, error) {
 	return item, err
 }
 
-func deleteItem(db *sql.DB, id int64) {
+// deleteItem deletes an item by id, returning number of affected rows
+func deleteItem(db *sql.DB, id int64) int64 {
 	sqlDelete := `
 	delete from logs
 	where ID = ?
@@ -228,10 +256,11 @@ func deleteItem(db *sql.DB, id int64) {
 	res, err := stmt.Exec(id)
 	checkErr(err)
 
-	_, err = res.RowsAffected()
-	checkErr(err)
+	affected, _ := res.RowsAffected()
+	return affected
 }
 
+// checkErr just panics if error is set
 func checkErr(err error) {
 	if err != nil {
 		panic(err)
