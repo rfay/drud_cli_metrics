@@ -22,10 +22,11 @@ import (
 	"strconv"
 )
 
+// LogItem is used for json and database interactions
 type LogItem struct {
 	ID               int64  `json:"id,omitempty"`
 	ResultCode       int64  `json:"result_code"`
-	MachineId        string `json:"machine_id,omitempty"`
+	MachineID        string `json:"machine_id,omitempty"`
 	Info             string `json:"info,omitempty"`
 	ClientTimestamp  int64  `json:"client_timestamp,omitempty"`
 	InsertedDatetime string `json:"inserted_datetime,omitempty"`
@@ -64,14 +65,14 @@ func createLogEndpoint(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	count, insertId := storeItem(pDb, logItem)
+	count, insertID := storeItem(pDb, logItem)
 	if count != 1 {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	// This extra read is extraneous, and we don't actually have to report
 	// the exact result, but it's useful for the short term.
-	logItem, _ = readItem(pDb, insertId)
+	logItem, _ = readItem(pDb, insertID)
 	json.NewEncoder(w).Encode(logItem)
 }
 
@@ -119,7 +120,7 @@ func initDB(filepath string) *sql.DB {
 
 func createLogsTable(db *sql.DB) {
 	// create table if not exists
-	sql_table := `
+	sqlTable := `
 	create table if not exists logs (
 		ID INTEGER PRIMARY KEY,
 		clientTimestamp INTEGER,
@@ -130,7 +131,7 @@ func createLogsTable(db *sql.DB) {
 	);
 	`
 
-	_, err := db.Exec(sql_table)
+	_, err := db.Exec(sqlTable)
 	if err != nil {
 		panic(err)
 	}
@@ -153,7 +154,7 @@ func storeItem(db *sql.DB, item LogItem) (int64, int64) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		res, err = stmt.Exec(item.ID, item.ClientTimestamp, item.ResultCode, item.MachineId, item.Info)
+		res, err = stmt.Exec(item.ID, item.ClientTimestamp, item.ResultCode, item.MachineID, item.Info)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -170,7 +171,7 @@ func storeItem(db *sql.DB, item LogItem) (int64, int64) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		res, err = stmt.Exec(item.ClientTimestamp, item.ResultCode, item.MachineId, item.Info)
+		res, err = stmt.Exec(item.ClientTimestamp, item.ResultCode, item.MachineID, item.Info)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -178,17 +179,17 @@ func storeItem(db *sql.DB, item LogItem) (int64, int64) {
 	}
 
 	affectedRowCount, _ := res.RowsAffected()
-	insertId, _ := res.LastInsertId()
-	return affectedRowCount, insertId
+	insertID, _ := res.LastInsertId()
+	return affectedRowCount, insertID
 }
 
 func readAllItems(db *sql.DB) []LogItem {
-	sql_readall := `
+	sqlReadAll := `
 	SELECT id, clientTimestamp, resultCode, machineId, info, insertedDatetime FROM logs
 	ORDER BY datetime(insertedDatetime)
 	`
 
-	rows, err := db.Query(sql_readall)
+	rows, err := db.Query(sqlReadAll)
 	if err != nil {
 		panic(err)
 	}
@@ -197,7 +198,7 @@ func readAllItems(db *sql.DB) []LogItem {
 	var result []LogItem
 	for rows.Next() {
 		logItem := LogItem{}
-		err2 := rows.Scan(&logItem.ID, &logItem.ClientTimestamp, &logItem.ResultCode, &logItem.MachineId, &logItem.Info, &logItem.InsertedDatetime)
+		err2 := rows.Scan(&logItem.ID, &logItem.ClientTimestamp, &logItem.ResultCode, &logItem.MachineID, &logItem.Info, &logItem.InsertedDatetime)
 		if err2 != nil {
 			panic(err2)
 		}
@@ -213,16 +214,16 @@ func readItem(db *sql.DB, id int64) (LogItem, error) {
 	`
 
 	var item LogItem
-	err := db.QueryRow(sqlReadOne, id).Scan(&item.ID, &item.ClientTimestamp, &item.ResultCode, &item.MachineId, &item.Info, &item.InsertedDatetime)
+	err := db.QueryRow(sqlReadOne, id).Scan(&item.ID, &item.ClientTimestamp, &item.ResultCode, &item.MachineID, &item.Info, &item.InsertedDatetime)
 	return item, err
 }
 
 func deleteItem(db *sql.DB, id int64) {
-	sql_delete := `
+	sqlDelete := `
 	delete from logs
 	where ID = ?
 	`
-	stmt, err := db.Prepare(sql_delete)
+	stmt, err := db.Prepare(sqlDelete)
 	checkErr(err)
 	res, err := stmt.Exec(id)
 	checkErr(err)
