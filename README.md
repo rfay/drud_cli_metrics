@@ -1,6 +1,7 @@
 # Drud CLI Metrics Microservice
 
 Runs a service to collect logging information from drud cli runs.
+[DRUD-448](https://newmediadenver.atlassian.net/browse/DRUD-448)
 
 ## Features still needed
 
