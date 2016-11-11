@@ -2,6 +2,15 @@
 
 Runs a service to collect logging information from drud cli runs.
 
+## Features still needed
+
+- [ ] Authentication/authorization of some type
+- [ ] Tests
+- [ ] Limit results from GET /logitem (probably provide a query technique)
+- [ ] Deployment on GCE
+- [ ] Consider an alternate backend instead of sqlite3 on node filesystem
+
+
 ## Deployment (in kubernetes directory)
 ```
 kubectl create -f deployments/drud_cli_metrics.yml
@@ -42,4 +51,13 @@ POST http://<cluster_ip>:30001/v1.0/logitems
 
 Body: {"result_code":403, "machine_id":"2301", "info":"nonoe", "client_timestamp": 939393}
 curl -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache"  -d '{"result_code":403, "machine_id":"2301", "info":"nonoe", "client_timestamp": 939393}' "http://192.168.99.100:30001/v1.0/logitem"
+```
+
+## Direct query of database
+
+On either the container or the node you can use sqlite3 to query the contents with classic sql:
+
+```
+sqlite3 /var/lib/sqlite3/drud_cli_metrics.db
+select * from logs
 ```
